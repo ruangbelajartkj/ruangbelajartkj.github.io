@@ -1033,6 +1033,36 @@ function toggleAdminLogin() {
   if (!modal.classList.contains('hidden')) document.getElementById('admin-username').focus();
 }
 
+function setupMobileNavigation() {
+  const toggle = document.querySelector('.menu-toggle');
+  const menu = document.getElementById('mobile-nav');
+  if (!toggle || !menu) return;
+
+  const closeMenu = () => {
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-label', 'Buka menu navigasi');
+    menu.classList.remove('is-open');
+    toggle.closest('.nav')?.classList.remove('menu-open');
+  };
+
+  toggle.addEventListener('click', event => {
+    event.stopPropagation();
+    const isOpen = toggle.getAttribute('aria-expanded') === 'true';
+    toggle.setAttribute('aria-expanded', String(!isOpen));
+    toggle.setAttribute('aria-label', isOpen ? 'Buka menu navigasi' : 'Tutup menu navigasi');
+    menu.classList.toggle('is-open', !isOpen);
+    toggle.closest('.nav')?.classList.toggle('menu-open', !isOpen);
+  });
+
+  menu.querySelectorAll('a').forEach(link => link.addEventListener('click', closeMenu));
+  document.addEventListener('click', event => {
+    if (!menu.contains(event.target) && !toggle.contains(event.target)) closeMenu();
+  });
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 760) closeMenu();
+  });
+}
+
 function ensureInfoAdminMenu() {
   if (document.getElementById('admin-panel')) return;
   const pageMain = document.querySelector('main.page-main');
@@ -1436,6 +1466,7 @@ async function saveScoreToSheet() {
 document.getElementById('search-materi')?.addEventListener('input', renderMateri);
 document.getElementById('filter-mapel')?.addEventListener('change', renderMateri);
 document.getElementById('select-mapel')?.addEventListener('change', updateQuizScheduleInfo);
+setupMobileNavigation();
 addUploadMapelSelect();
 document.getElementById('file-materi')?.addEventListener('change', event => addLocalMaterials(event.target.files));
 document.getElementById('admin-login-form')?.addEventListener('submit', loginAdmin);
