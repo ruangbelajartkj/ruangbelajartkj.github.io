@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kuis | RuangKelas TJKT</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header><div class="shell nav"><a class="brand" href="index.html"><span class="brand-mark">R</span> RuangKelas</a><nav class="nav-links"><a href="materi.html">Materi</a><a href="kuis.html">Kuis</a><a href="info.html">Info</a></nav><a id="profile-button" class="profile" href="admin.html" aria-label="Login admin"><span class="avatar">AD</span> Admin</a></div></header>
+  <main class="shell page-main"><section class="page-heading"><div class="eyebrow">Latihan mandiri TJKT</div><h1>Uji pemahaman</h1><p id="quiz-schedule-info">Kerjakan kuis sesuai hari yang telah ditentukan admin.</p></section><section class="quiz quiz-page"><div id="quiz-intro" class="quiz-intro">Lengkapi identitas sebelum memulai kuis.</div><div id="quiz-fields" class="quiz-fields"><input id="nama-siswa" class="quiz-name" type="text" placeholder="Nama siswa" aria-label="Nama siswa"><select id="kelas-siswa" aria-label="Kelas siswa"><option value="">Pilih kelas</option><option value="XII TKJ 1">XII TKJ 1</option><option value="XII TKJ 2">XII TKJ 2</option></select><select id="select-mapel" aria-label="Mata pelajaran"><option value="KJR">Keamanan Jaringan</option><option value="PKPJ">Pemasangan dan Konfigurasi Perangkat Jaringan</option></select></div><div id="identitas-error" class="identity-error hidden" role="alert"></div><button id="btn-start" class="button" onclick="loadKuis()">Mulai kuis <span>↗</span></button><div id="kuis-container" class="hidden"><div class="quiz-meta"><span id="nomor-soal"></span><span id="timer-soal">Waktu: 15 detik</span><span id="skor-soal">Skor: 0</span></div><div id="soal-box"></div><div id="opsi-box"></div><div class="quiz-controls"><button id="btn-next" class="quiz-next" onclick="nextQuestion()">Next →</button><button id="btn-cancel" class="quiz-cancel" onclick="cancelQuiz()">Batal</button></div><div id="hasil-kuis" class="hidden"></div></div></section></main>
+  <footer><div class="shell">© 2025 RuangKelas TJKT <span style="float:right">Belajar. Praktik. Terhubung.</span></div></footer>
+  <div id="admin-login" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="login-title"><div class="modal-card"><button class="modal-close" onclick="toggleAdminLogin()" aria-label="Tutup">×</button><h2 id="login-title">Login admin</h2><p>Masuk untuk mengatur materi pembelajaran.</p><form id="admin-login-form"><input id="admin-username" type="text" placeholder="Username" autocomplete="username" required><input id="admin-password" type="password" placeholder="Password" autocomplete="current-password" required><div id="login-error" class="login-error hidden" role="alert"></div><button class="button" type="submit">Masuk ke panel</button></form></div></div>
+  <script src="script.js"></script>
+</body>
+</html>
