@@ -16,7 +16,7 @@ header { border-bottom: 1px solid rgba(220,229,223,.8); background: rgba(245,247
 .menu-toggle[aria-expanded="true"] span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 .nav-links { display: flex; gap: 28px; color: var(--muted); font-size: 14px; }
 .nav-links a { position: relative; color: inherit; text-decoration: none; transition: color .2s ease, font-weight .2s ease; } .nav-links a:after { content: ''; position: absolute; right: 0; bottom: -7px; left: 0; height: 2px; background: var(--orange); transform: scaleX(0); transform-origin: center; transition: transform .2s ease; } .nav-links a:hover { color: var(--teal); font-weight: 700; } .nav-links a:hover:after { transform: scaleX(1); }
-.nav-links a.nav-active { color: var(--teal); font-weight: 700; }
+.nav-links a.nav-active { color: var(--teal); font-weight: 700; } .nav-links a.nav-active:after { transform: scaleX(1); }
 .profile { display: flex; align-items: center; gap: 9px; padding: 0; color: var(--ink); background: transparent; font-size: 13px; font-weight: 700; text-decoration: none; } .profile:hover { color: var(--teal); } .admin-active { color: var(--teal); }
 .connection-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 12px; font-weight: 600; border-radius: 6px; color: var(--muted); background: transparent; } .connection-badge span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; animation: none; }
 .connection-loading { color: #f59e0b; } .connection-loading span { background: #f59e0b; animation: pulse 1.5s ease-in-out infinite; }

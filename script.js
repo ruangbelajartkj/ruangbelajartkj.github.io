@@ -1033,10 +1033,23 @@ function toggleAdminLogin() {
   if (!modal.classList.contains('hidden')) document.getElementById('admin-username').focus();
 }
 
+function setupBrandDisplay() {
+  document.querySelectorAll('.brand').forEach(brand => {
+    const textNode = Array.from(brand.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
+    if (textNode) textNode.nodeValue = ' RuangKelas/XI TJKT';
+  });
+}
+
 function setupMobileNavigation() {
   const toggle = document.querySelector('.menu-toggle');
   const menu = document.getElementById('mobile-nav');
   if (!toggle || !menu) return;
+
+  const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+  menu.querySelectorAll('a[href]').forEach(link => {
+    const linkPage = link.getAttribute('href').split('/').pop().split('#')[0];
+    link.classList.toggle('nav-active', linkPage === currentPage);
+  });
 
   const closeMenu = () => {
     toggle.setAttribute('aria-expanded', 'false');
@@ -1468,6 +1481,7 @@ document.getElementById('search-materi')?.addEventListener('input', renderMateri
 document.getElementById('filter-mapel')?.addEventListener('change', renderMateri);
 document.getElementById('select-mapel')?.addEventListener('change', updateQuizScheduleInfo);
 setupMobileNavigation();
+setupBrandDisplay();
 addUploadMapelSelect();
 document.getElementById('file-materi')?.addEventListener('change', event => addLocalMaterials(event.target.files));
 document.getElementById('admin-login-form')?.addEventListener('submit', loginAdmin);
