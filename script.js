@@ -1,4 +1,4 @@
-const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwe687AAhBUUL3O_ByN2xALgfs9NbH_-oMKwglYxqSbtr8pDHPBfzA5Cmjk--bL1OqW/exec'; // Isi dengan URL Web App Google Apps Script.
+const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwIKGLMrcS_2MIuEEVzh-NI09NTOo6g6moR3bNCLZz8V4YktZRqPzIj1zUIPbGZH-W1/exec'; // Isi dengan URL Web App Google Apps Script.
 const ADMIN_USERNAME = 'admin';
 const ADMIN_PASSWORD = 'tjkt2025';
 const DEFAULT_QUIZ_DURATION = 15;
@@ -1441,6 +1441,7 @@ function finishQuiz() {
 async function saveScoreToSheet() {
   if (!GOOGLE_SHEETS_URL) return;
   const payload = {
+    action: 'saveQuiz',
     nama: document.getElementById('nama-siswa').value.trim() || 'Tanpa nama',
     kelas: document.getElementById('kelas-siswa').value,
     mapel: document.getElementById('select-mapel').value,
