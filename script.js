@@ -1,4 +1,4 @@
-const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwIKGLMrcS_2MIuEEVzh-NI09NTOo6g6moR3bNCLZz8V4YktZRqPzIj1zUIPbGZH-W1/exec'; // Isi dengan URL Web App Google Apps Script.
+const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbx0pmnFiYFnUtQUqLHgKLn2FN0j4Ke_wS5g5-uETSGZ_N0wz74cWB4F8O8B9YnDWEgE/exec'; // Isi dengan URL Web App Google Apps Script.
 const ADMIN_USERNAME = 'admin';
 const ADMIN_PASSWORD = 'tjkt2025';
 const DEFAULT_QUIZ_DURATION = 15;
@@ -7,6 +7,7 @@ const QUIZ_MAPEL_KEY = 'ruangkelas.quizMapel';
 
 const QUIZ_SCHEDULES_KEY = 'ruangkelas.quizSchedules';
 const MATERIALS_KEY = 'ruangkelas.materials';
+// Menambahkan pilihan mata pelajaran yang belum tersedia pada elemen select.
 const MATERIALS_DB_NAME = 'ruangkelas.db';
 const MATERIALS_STORE_NAME = 'materials';
 const LANDING_CONTENT_KEY = 'ruangkelas.landingContent';
@@ -17,11 +18,76 @@ const defaultLandingContent = {
   button: 'Mulai belajar',
   image: ''
 };
+
+const PAGE_ROUTE_MAP = {
+  'index.html': 'home',
+  'materi.html': 'materi',
+  'kuis.html': 'kuis',
+  'absensi.html': 'absensi',
+  'info.html': 'info',
+  'admin.html': 'admin'
+};
+
+function encodePageToken(value) {
+  try {
+    const encoded = btoa(unescape(encodeURIComponent(value)));
+    return encoded.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  } catch (error) {
+    return value;
+  }
+}
+
+function decodePageToken(token) {
+  try {
+    const normalized = token.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+    return decodeURIComponent(escape(atob(padded)));
+  } catch (error) {
+    return null;
+  }
+}
+
+function getCurrentPageFile() {
+  return window.location.pathname.split('/').pop() || 'index.html';
+}
+
+function updateSafePageUrl() {
+  const currentPage = getCurrentPageFile();
+  if (!PAGE_ROUTE_MAP[currentPage]) return;
+
+  const url = new URL(window.location.href);
+  const currentToken = url.searchParams.get('p');
+
+  if (!currentToken) {
+    url.searchParams.set('p', encodePageToken(currentPage));
+    window.history.replaceState({}, '', url);
+  }
+}
+
+function setupSafeNavigation() {
+  document.querySelectorAll('a[href]').forEach(link => {
+    const href = link.getAttribute('href');
+    if (!href || href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('#') || href.startsWith('tel:')) return;
+
+    const targetFile = href.split('?')[0].split('#')[0].split('/').pop();
+    if (!targetFile || !PAGE_ROUTE_MAP[targetFile]) return;
+
+    link.addEventListener('click', event => {
+      event.preventDefault();
+      const targetUrl = new URL(href, window.location.href);
+      const token = encodePageToken(targetFile);
+      targetUrl.searchParams.set('p', token);
+      window.location.assign(targetUrl.toString());
+    });
+  });
+}
+
 let remoteMaterialsLoaded = false;
 let remoteConfigAvailable = false;
 let connectionStatus = 'loading'; // loading, connected, offline
 let lastSyncTime = null;
 
+// Memperbarui status koneksi yang tampil pada antarmuka.
 function updateConnectionStatus(status, message = '') {
   connectionStatus = status;
   const badge = document.getElementById('connection-status');
@@ -42,6 +108,7 @@ function updateConnectionStatus(status, message = '') {
   }
 }
 
+// Memperbarui indikator proses sinkronisasi data.
 function updateSyncIndicator(syncing = false) {
   const indicator = document.getElementById('sync-indicator');
   if (!indicator) return;
@@ -58,6 +125,7 @@ function updateSyncIndicator(syncing = false) {
 }
 
 // Toast Notification System
+// Menampilkan notifikasi sementara kepada pengguna.
 function showToast(message, type = 'info', duration = 4000) {
   const container = document.getElementById('toast-container');
   if (!container) return;
@@ -76,6 +144,7 @@ function showToast(message, type = 'info', duration = 4000) {
 }
 
 // URL Validation
+// Memeriksa apakah teks merupakan URL atau jalur file yang dapat digunakan.
 function isValidUrl(urlString) {
   const value = urlString.trim();
   if (!value) return false;
@@ -96,6 +165,7 @@ function isValidUrl(urlString) {
   }
 }
 
+// Menormalkan satu atau beberapa link materi menjadi array link bersih.
 function normalizeMaterialLinks(value) {
   if (Array.isArray(value)) {
     return value.map(item => String(item).trim()).filter(Boolean);
@@ -109,6 +179,7 @@ function normalizeMaterialLinks(value) {
 }
 
 // Material Validation
+// Memvalidasi judul, deskripsi, dan link sebelum materi disimpan.
 function validateMaterial(judul, deskripsi, link) {
   const links = normalizeMaterialLinks(link);
 
@@ -133,6 +204,7 @@ function validateMaterial(judul, deskripsi, link) {
 }
 
 // Set button loading state
+// Mengubah tombol menjadi status memuat dan mengembalikan teks semula.
 function setButtonLoading(button, isLoading) {
   if (!button) return;
   if (isLoading) {
@@ -145,11 +217,13 @@ function setButtonLoading(button, isLoading) {
   }
 }
 
+// Membuat kunci unik untuk membandingkan materi lokal dan server.
 function getMaterialSignature(material = {}) {
   const linkValue = Array.isArray(material.link) ? material.link.join('|') : (material.link || '');
   return `${(material.mapel || '').toLowerCase()}::${(material.judul || '').trim().toLowerCase()}::${linkValue.trim().toLowerCase()}`;
 }
 
+// Menghapus metadata sementara sebelum materi disimpan.
 function normalizeMaterialForStorage(material = {}) {
   const normalized = { ...material };
   delete normalized.source;
@@ -160,6 +234,7 @@ function normalizeMaterialForStorage(material = {}) {
   return normalized;
 }
 
+// Menggabungkan materi lokal dan server tanpa membuat duplikasi.
 function mergeMaterials(localItems = [], remoteItems = []) {
   const merged = new Map();
   const localArray = Array.isArray(localItems) ? localItems : [];
@@ -191,6 +266,7 @@ function mergeMaterials(localItems = [], remoteItems = []) {
   }));
 }
 
+// Mengambil konfigurasi terbaru dari Google Apps Script.
 async function loadRemoteConfig() {
   if (!GOOGLE_SHEETS_URL) return;
   
@@ -255,6 +331,7 @@ async function loadRemoteConfig() {
   }
 }
 
+// Menyimpan konfigurasi aplikasi ke Google Apps Script.
 async function saveRemoteConfig(key, value) {
   if (!GOOGLE_SHEETS_URL) {
     console.error('URL Web App Google Apps Script belum diatur.');
@@ -304,7 +381,7 @@ const fallbackKuis = {
     { soal: 'Social engineering menyerang...', opsi: ['Manusia dan perilakunya', 'Hanya kabel fiber', 'Hanya prosesor', 'Sistem pendingin'], jawaban: 0 }
   ],
   PKPJ: [
-    { soal: 'Perangkat yang menghubungkan beberapa komputer dalam satu LAN adalah...', opsi: ['Switch', 'Printer', 'Scanner', 'UPS'], jawaban: 0 },
+    { soal: 'Sebutkan contoh IP Address kelas A...', opsi: ['127.0.0.1', '192.168.1.1', '13.13.13.1', '221.221.1.1', '225.225.225.1'], jawaban: 2 },
     { soal: 'Alat untuk memasang konektor RJ45 pada kabel UTP disebut...', opsi: ['Tang crimping', 'Obeng plus', 'Multimeter', 'Kunci inggris'], jawaban: 0 },
     { soal: 'Kabel yang digunakan untuk menghubungkan komputer ke switch adalah...', opsi: ['Straight-through', 'Rollover', 'Kabel listrik', 'Kabel telepon'], jawaban: 0 },
     { soal: 'Urutan standar kabel straight-through pada kedua ujungnya adalah...', opsi: ['T568A-T568A atau T568B-T568B', 'T568A-T568B saja', 'RJ11-RJ11', 'USB-USB'], jawaban: 0 },
@@ -349,6 +426,7 @@ let editingMaterialIndex = null;
 let editingQuizScheduleIndex = null;
 const mapelNames = { KJR: 'Keamanan', PKPJ: 'Pemasangan perangkat', TJKDN: 'Kabel dan nirkabel' };
 
+// Memuat materi dari penyimpanan dan menampilkannya pada halaman.
 async function loadMateri() {
   const savedMaterials = remoteMaterialsLoaded ? null : await getSavedMaterials();
   if (savedMaterials) allMateri = savedMaterials;
@@ -358,11 +436,13 @@ async function loadMateri() {
   updateQuizScheduleInfo();
 }
 
+// Memperbarui jumlah modul yang ditampilkan.
 function updateModuleCount() {
   const jumlahModul = document.getElementById('jumlah-modul');
   if (jumlahModul) jumlahModul.textContent = allMateri.length;
 }
 
+// Mengambil konten landing page dengan nilai bawaan sebagai cadangan.
 function getLandingContent() {
   try {
     return { ...defaultLandingContent, ...(JSON.parse(localStorage.getItem(LANDING_CONTENT_KEY)) || {}) };
@@ -371,6 +451,7 @@ function getLandingContent() {
   }
 }
 
+// Menampilkan konten landing page ke elemen HTML terkait.
 function renderLandingContent() {
   const content = getLandingContent();
   const eyebrow = document.getElementById('landing-eyebrow');
@@ -399,6 +480,7 @@ function renderLandingContent() {
   }
 }
 
+// Menyimpan perubahan konten landing page ke penyimpanan lokal dan server.
 async function saveLandingContent() {
   const imageInput = document.getElementById('landing-image-file');
   const content = {
@@ -427,6 +509,7 @@ async function saveLandingContent() {
   alert('Konten landing page berhasil disimpan.');
 }
 
+// Mengembalikan konten landing page ke nilai bawaan aplikasi.
 function resetLandingContent() {
   if (!confirm('Kembalikan landing page ke konten bawaan?')) return;
   localStorage.removeItem(LANDING_CONTENT_KEY);
@@ -436,6 +519,7 @@ function resetLandingContent() {
   alert('Landing page dikembalikan ke konten bawaan.');
 }
 
+// Mengisi formulir editor landing page dengan data tersimpan.
 function loadLandingEditor() {
   const content = getLandingContent();
   const eyebrow = document.getElementById('landing-eyebrow-input');
@@ -446,6 +530,7 @@ function loadLandingEditor() {
   document.getElementById('landing-button-input').value = content.button;
 }
 
+// Membuka database IndexedDB untuk menyimpan file materi lokal.
 function openMaterialsDb() {
   return new Promise((resolve, reject) => {
     if (!window.indexedDB) {
@@ -459,6 +544,7 @@ function openMaterialsDb() {
   });
 }
 
+// Mengambil materi dari IndexedDB atau localStorage sebagai cadangan.
 async function getSavedMaterials() {
   try {
     const database = await openMaterialsDb();
@@ -480,6 +566,7 @@ async function getSavedMaterials() {
   }
 }
 
+// Menyimpan seluruh materi ke penyimpanan lokal dan server.
 async function saveMaterials() {
   const storageData = allMateri.map(normalizeMaterialForStorage);
 
@@ -507,6 +594,7 @@ async function saveMaterials() {
   }
 }
 
+// Membuka file PDF dalam jendela pratinjau baru.
 function openMaterialLink(url, event) {
   if (!url || url === '#') return true;
 
@@ -542,11 +630,13 @@ function openMaterialLink(url, event) {
   return false;
 }
 
+// Mengambil daftar link materi dalam format array.
 function getMaterialLinks(material) {
   const links = normalizeMaterialLinks(material.link);
   return links.length ? links : [material.link || '#'];
 }
 
+// Merender daftar materi sesuai pencarian dan filter mata pelajaran.
 function renderMateri() {
   updateModuleCount();
   if (!document.getElementById('materi-container')) return;
@@ -569,6 +659,7 @@ function renderMateri() {
   }).join('') : '<p style="color:var(--muted)">Materi tidak ditemukan.</p>';
 }
 
+// Merender materi dalam tabel pengelolaan admin.
 function renderMaterialsTable() {
   const tbody = document.getElementById('materi-table-body');
   const emptyMsg = document.getElementById('materi-empty-message');
@@ -601,6 +692,7 @@ function renderMaterialsTable() {
   }).join('');
 }
 
+// Membaca file lokal dan menambahkannya sebagai materi baru.
 async function addLocalMaterials(files) {
   if (!files?.length) return;
   const mapel = document.getElementById('upload-mapel')?.value || 'KJR';
@@ -634,6 +726,7 @@ async function addLocalMaterials(files) {
   }
 }
 
+// Memastikan komponen editor link materi tersedia pada formulir.
 function ensureMaterialLinkEditor() {
   const editor = document.getElementById('material-editor');
   if (!editor) return;
@@ -709,6 +802,7 @@ function ensureMaterialLinkEditor() {
   }
 }
 
+// Menambahkan kolom input link materi tambahan.
 function addMaterialLinkField() {
   const container = document.getElementById('material-links-container');
   if (!container) return;
@@ -737,6 +831,7 @@ function addMaterialLinkField() {
   input.focus();
 }
 
+// Mengambil semua nilai link dari editor materi.
 function getMaterialLinkInputs() {
   const container = document.getElementById('material-links-container');
   if (!container) return [];
@@ -749,6 +844,7 @@ function getMaterialLinkInputs() {
   return values;
 }
 
+// Mengisi ulang kolom link editor berdasarkan daftar link yang diberikan.
 function resetMaterialLinkInputs(links = []) {
   const container = document.getElementById('material-links-container');
   if (!container) return;
@@ -796,6 +892,7 @@ function resetMaterialLinkInputs(links = []) {
   });
 }
 
+// Membuka editor untuk menambah atau mengubah materi.
 function openMaterialEditor(index = null) {
   editingMaterialIndex = index;
   const material = index === null ? {} : allMateri[index];
@@ -810,12 +907,14 @@ function openMaterialEditor(index = null) {
   document.getElementById('editor-judul').focus();
 }
 
+// Menutup editor materi dan menghapus status pengeditan.
 function closeMaterialEditor() {
   editingMaterialIndex = null;
   resetMaterialLinkInputs([]);
   document.getElementById('material-editor').classList.add('hidden');
 }
 
+// Memvalidasi dan menyimpan materi baru atau hasil perubahan materi.
 async function saveMaterial() {
   const judul = document.getElementById('editor-judul').value.trim();
   const deskripsi = document.getElementById('editor-deskripsi').value.trim();
@@ -861,6 +960,7 @@ async function saveMaterial() {
   }
 }
 
+// Menghapus materi setelah pengguna memberikan konfirmasi.
 async function deleteMaterial(index) {
   const material = allMateri[index];
   if (!material) return;
@@ -885,6 +985,7 @@ async function deleteMaterial(index) {
 }
 
 // Export materi ke JSON
+// Mengunduh seluruh materi dalam format JSON.
 function exportMaterials() {
   try {
     const dataStr = JSON.stringify(allMateri, null, 2);
@@ -904,6 +1005,7 @@ function exportMaterials() {
 }
 
 // Import materi dari JSON
+// Membaca file JSON dan menambahkan isinya ke daftar materi.
 function importMaterials() {
   const input = document.createElement('input');
   input.type = 'file';
@@ -949,6 +1051,7 @@ function importMaterials() {
 }
 
 // Get material statistics
+// Menghitung jumlah materi berdasarkan mata pelajaran dan sumbernya.
 function getMaterialStats() {
   return {
     total: allMateri.length,
@@ -965,6 +1068,7 @@ function getMaterialStats() {
 }
 
 // Display material management info
+// Menampilkan statistik materi pada panel admin.
 function displayMaterialInfo() {
   const stats = getMaterialStats();
   const adminPanel = document.getElementById('admin-panel');
@@ -1003,6 +1107,7 @@ function addPkpjOptions() {
   });
 }
 
+// Menambahkan pilihan mata pelajaran pada kontrol unggah materi.
 function addUploadMapelSelect() {
   const fileInput = document.getElementById('file-materi');
   if (!fileInput || document.getElementById('upload-mapel')) return;
@@ -1014,6 +1119,7 @@ function addUploadMapelSelect() {
   fileInput.closest('label').before(select);
 }
 
+// Membatasi pilihan kelas sesuai kelas yang didukung aplikasi.
 function restrictClassOptions() {
   const classSelect = document.getElementById('kelas-siswa');
   if (!classSelect) return;
@@ -1022,24 +1128,28 @@ function restrictClassOptions() {
   });
 }
 
+// Mengarahkan navigasi utama ke halaman materi dan kuis.
 function updateMainNavigation() {
   document.querySelector('a[href="#materi"]')?.setAttribute('href', 'materi.html');
   document.querySelector('a[href="#kuis"]')?.setAttribute('href', 'kuis.html');
 }
 
+// Membuka atau menutup dialog login admin.
 function toggleAdminLogin() {
   const modal = document.getElementById('admin-login');
   modal.classList.toggle('hidden');
   if (!modal.classList.contains('hidden')) document.getElementById('admin-username').focus();
 }
 
+// Menyesuaikan nama brand pada seluruh elemen brand.
 function setupBrandDisplay() {
   document.querySelectorAll('.brand').forEach(brand => {
     const textNode = Array.from(brand.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
-    if (textNode) textNode.nodeValue = ' RuangKelas/XI TJKT';
+    if (textNode) textNode.nodeValue = ' RuangKelas/XII TJKTT';
   });
 }
 
+// Mengatur perilaku menu navigasi pada tampilan mobile.
 function setupMobileNavigation() {
   const toggle = document.querySelector('.menu-toggle');
   const menu = document.getElementById('mobile-nav');
@@ -1076,6 +1186,7 @@ function setupMobileNavigation() {
   });
 }
 
+// Menambahkan panel akses admin pada halaman informasi bila diperlukan.
 function ensureInfoAdminMenu() {
   if (document.getElementById('admin-panel')) return;
   const pageMain = document.querySelector('main.page-main');
@@ -1087,6 +1198,7 @@ function ensureInfoAdminMenu() {
   pageMain.insertBefore(panel, pageMain.querySelector('.info-panel'));
 }
 
+// Memeriksa kredensial login admin dan mengaktifkan mode admin.
 function loginAdmin(event) {
   event.preventDefault();
   const username = document.getElementById('admin-username').value.trim();
@@ -1111,10 +1223,12 @@ function loginAdmin(event) {
   showToast('Login admin berhasil', 'success');
 }
 
+// Mengambil tanggal jadwal kuis yang sedang aktif.
 function getQuizDate() {
   return getActiveQuizSchedule()?.date || '';
 }
 
+// Mengambil dan memvalidasi seluruh jadwal kuis tersimpan.
 function getQuizSchedules() {
   try {
     const saved = JSON.parse(localStorage.getItem(QUIZ_SCHEDULES_KEY) || 'null');
@@ -1124,6 +1238,7 @@ function getQuizSchedules() {
   return date ? [{ date, mapel: localStorage.getItem(QUIZ_MAPEL_KEY) || 'KJR' }] : [];
 }
 
+// Menentukan jadwal kuis terdekat atau jadwal terakhir.
 function getActiveQuizSchedule() {
   const schedules = getQuizSchedules().sort((first, second) => first.date.localeCompare(second.date));
   return schedules.find(schedule => schedule.date === getTodayDate())
@@ -1132,6 +1247,7 @@ function getActiveQuizSchedule() {
     || null;
 }
 
+// Menentukan jadwal kuis terdekat untuk mata pelajaran tertentu.
 function getQuizScheduleForMapel(mapel) {
   const schedules = getQuizSchedules().filter(schedule => schedule.mapel === mapel)
     .sort((first, second) => first.date.localeCompare(second.date));
@@ -1141,6 +1257,7 @@ function getQuizScheduleForMapel(mapel) {
     || null;
 }
 
+// Menyimpan jadwal kuis yang valid ke lokal dan server.
 function saveQuizSchedules(schedules) {
   const validSchedules = schedules.filter(schedule => schedule.date && schedule.mapel)
     .sort((first, second) => first.date.localeCompare(second.date));
@@ -1156,10 +1273,12 @@ function saveQuizSchedules(schedules) {
   saveRemoteConfig('quizSchedules', validSchedules);
 }
 
+// Mengubah kode mata pelajaran menjadi nama yang mudah dibaca.
 function getQuizMapelName(mapel) {
   return { KJR: 'Keamanan Jaringan', PKPJ: 'Pemasangan dan Konfigurasi Perangkat Jaringan', TJKDN: 'Teknologi Jaringan Kabel dan Nirkabel' }[mapel] || mapel;
 }
 
+// Memastikan kontrol pemilihan mata pelajaran kuis tersedia.
 function ensureQuizMapelControl() {
   const dateInput = document.getElementById('quiz-date');
   if (!dateInput || document.getElementById('quiz-mapel')) return;
@@ -1174,6 +1293,7 @@ function ensureQuizMapelControl() {
   dateInput.parentElement.parentElement.insertBefore(label, select);
 }
 
+// Memuat jadwal pertama ke formulir pengaturan jadwal kuis.
 function loadQuizScheduleRows() {
   const schedules = getQuizSchedules();
   if (!document.getElementById('quiz-date')) return;
@@ -1182,6 +1302,7 @@ function loadQuizScheduleRows() {
   document.getElementById('quiz-mapel').value = firstSchedule.mapel || 'KJR';
 }
 
+// Menampilkan seluruh jadwal kuis pada dashboard admin.
 function renderAdminQuizSchedules() {
   const setting = document.querySelector('.quiz-schedule-setting');
   if (!setting) return;
@@ -1209,6 +1330,7 @@ function renderAdminQuizSchedules() {
   });
 }
 
+// Menghapus jadwal kuis yang dipilih admin.
 function deleteQuizSchedule(index) {
   const schedules = getQuizSchedules();
   if (!schedules[index] || !confirm(`Hapus jadwal ${getQuizMapelName(schedules[index].mapel)}?`)) return;
@@ -1220,6 +1342,7 @@ function deleteQuizSchedule(index) {
   updateQuizScheduleInfo();
 }
 
+// Menyimpan atau memperbarui jadwal kuis dari formulir admin.
 function saveQuizDate() {
   const date = document.getElementById('quiz-date').value;
   const mapel = document.getElementById('quiz-mapel')?.value || 'KJR';
@@ -1240,6 +1363,7 @@ function saveQuizDate() {
   updateQuizScheduleInfo();
 }
 
+// Memproses login pada halaman dashboard admin.
 async function loginAdminPage(event) {
   event.preventDefault();
   const username = document.getElementById('admin-page-username').value.trim();
@@ -1262,21 +1386,25 @@ async function loginAdminPage(event) {
   updateQuizScheduleInfo();
 }
 
+// Keluar dari dashboard admin dan menampilkan formulir login kembali.
 function logoutAdminPage() {
   document.getElementById('admin-dashboard').classList.add('hidden');
   document.getElementById('admin-access').classList.remove('hidden');
   document.getElementById('admin-page-login-form').reset();
 }
 
+// Memformat tanggal kuis menggunakan format tanggal Indonesia.
 function formatQuizDate(date) {
   return new Intl.DateTimeFormat('id-ID', { dateStyle: 'full' }).format(new Date(`${date}T00:00:00`));
 }
 
+// Menghasilkan tanggal hari ini dalam format YYYY-MM-DD.
 function getTodayDate() {
   const today = new Date();
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 }
 
+// Menampilkan ringkasan jadwal kuis untuk setiap mata pelajaran.
 function renderQuizScheduleList(schedules) {
   const scheduleDetails = document.querySelector('.schedule-details');
   if (!scheduleDetails) return;
@@ -1289,6 +1417,7 @@ function renderQuizScheduleList(schedules) {
   scheduleDetails.classList.remove('hidden');
 }
 
+// Memperbarui informasi jadwal dan status tombol mulai kuis.
 function updateQuizScheduleInfo() {
   const schedules = getQuizSchedules();
   const activeSchedule = getActiveQuizSchedule();
@@ -1322,6 +1451,7 @@ function updateQuizScheduleInfo() {
   }
 }
 
+// Menonaktifkan mode admin pada halaman utama.
 function logoutAdmin() {
   document.getElementById('admin-panel')?.classList.add('hidden');
   document.body.classList.remove('admin-mode');
@@ -1331,6 +1461,7 @@ function logoutAdmin() {
   renderMateri();
 }
 
+// Memvalidasi identitas siswa dan memulai kuis sesuai mata pelajaran.
 function loadKuis() {
   const mapel = document.getElementById('select-mapel').value;
   const schedules = getQuizSchedules();
@@ -1367,6 +1498,7 @@ function loadKuis() {
   renderQuestion();
 }
 
+// Menampilkan soal aktif beserta pilihan jawabannya.
 function renderQuestion() {
   const q = currentKuisData[currentQuestion];
   startQuestionTimer();
@@ -1379,6 +1511,7 @@ function renderQuestion() {
   }
 }
 
+// Memulai atau mengulang penghitung waktu untuk soal aktif.
 function startQuestionTimer() {
   clearInterval(timerId);
   remainingSeconds = DEFAULT_QUIZ_DURATION;
@@ -1398,17 +1531,20 @@ function startQuestionTimer() {
   }, 1000);
 }
 
+// Memperbarui tampilan sisa waktu soal.
 function updateTimerDisplay() {
   const timer = document.getElementById('timer-soal');
   timer.textContent = `Waktu: ${remainingSeconds} detik`;
   timer.classList.toggle('timer-warning', remainingSeconds <= 10);
 }
 
+// Menyimpan pilihan jawaban siswa untuk soal aktif.
 function saveSelectedAnswer() {
   const selected = document.querySelector('input[name="jawaban"]:checked');
   if (selected) selectedAnswers[currentQuestion] = Number(selected.value);
 }
 
+// Membatalkan kuis dan mengembalikan tampilan ke formulir identitas.
 function cancelQuiz() {
   clearInterval(timerId);
   currentQuestion = 0;
@@ -1425,6 +1561,7 @@ function cancelQuiz() {
   document.getElementById('btn-next').style.display = 'block';
 }
 
+// Memeriksa jawaban lalu berpindah ke soal berikutnya atau menyelesaikan kuis.
 function nextQuestion() {
   saveSelectedAnswer();
   if (selectedAnswers[currentQuestion] === undefined) {
@@ -1439,6 +1576,7 @@ function nextQuestion() {
   renderQuestion();
 }
 
+// Menghitung skor akhir dan menampilkan hasil kuis.
 function finishQuiz() {
   clearInterval(timerId);
   score = currentKuisData.reduce((total, question, index) => total + (selectedAnswers[index] === Number(question.jawaban) ? 1 : 0), 0);
@@ -1451,6 +1589,7 @@ function finishQuiz() {
   document.getElementById('opsi-box').innerHTML = '';
 }
 
+// Mengirim hasil kuis siswa ke Google Apps Script.
 async function saveScoreToSheet() {
   if (!GOOGLE_SHEETS_URL) return;
   const payload = {
@@ -1480,6 +1619,8 @@ async function saveScoreToSheet() {
 document.getElementById('search-materi')?.addEventListener('input', renderMateri);
 document.getElementById('filter-mapel')?.addEventListener('change', renderMateri);
 document.getElementById('select-mapel')?.addEventListener('change', updateQuizScheduleInfo);
+updateSafePageUrl();
+setupSafeNavigation();
 setupMobileNavigation();
 setupBrandDisplay();
 addUploadMapelSelect();
@@ -1500,6 +1641,7 @@ if (quizMapelParam === 'TJKDN' && document.getElementById('select-mapel')) {
 }
 restrictClassOptions();
 updateMainNavigation();
+// Menginisialisasi data awal, tampilan, dan sinkronisasi konfigurasi berkala.
 async function initializeApp() {
   // Set initial connection status
   updateConnectionStatus('loading');

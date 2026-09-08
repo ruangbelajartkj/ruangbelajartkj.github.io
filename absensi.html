@@ -21,8 +21,8 @@
         <label for="attendance-class">Kelas</label>
         <select id="attendance-class" name="kelas" required>
           <option value="">Pilih kelas</option>
-          <option value="XI TJKT 1">XI TJKT 1</option>
-          <option value="XI TJKT 2">XI TJKT 2</option>
+          <option value="XII TJKTT 1">XII TJKTT 1</option>
+          <option value="XII TJKTT 2">XII TJKTT 2</option>
         </select>
         <button class="button" type="submit">Kirim absensi <span>→</span></button>
       </form>
@@ -32,6 +32,7 @@
   <footer><div class="shell">© 2026 RuangKelas TJKT <span style="float:right">Belajar. Praktik. Terhubung.</span></div></footer>
   <script src="script.js"></script>
   <script>
+    // Memvalidasi dan mengirim data absensi siswa ke server.
     document.getElementById('attendance-form').addEventListener('submit', async event => {
       event.preventDefault();
       const name = document.getElementById('attendance-name').value.trim();
